@@ -1,0 +1,29 @@
+{
+  "user_based": {
+    "precision@k": 0.0,
+    "recall@k": 0.0,
+    "f1@k": 0.0,
+    "hit_rate": 0.0,
+    "evaluated_users": 1,
+    "coverage": 0.01,
+    "catalog_coverage": 0.0003171884416531862
+  },
+  "item_based": {
+    "precision@k": 0.0,
+    "recall@k": 0.0,
+    "f1@k": 0.0,
+    "hit_rate": 0.0,
+    "evaluated_users": 1,
+    "coverage": 0.01,
+    "catalog_coverage": 0.0003171884416531862
+  },
+  "matrix_factorization": {
+    "precision@k": 0.0,
+    "recall@k": 0.0,
+    "f1@k": 0.0,
+    "hit_rate": 0.0,
+    "evaluated_users": 1,
+    "coverage": 0.01,
+    "catalog_coverage": 0.0003171884416531862
+  }
+}

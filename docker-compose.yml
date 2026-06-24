@@ -1,0 +1,53 @@
+version: '3.8'
+
+services:
+
+  # FastAPI recommendation backend
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: movierec-api
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/app/data
+      - ./models:/app/models
+      - ./logs:/app/logs
+    environment:
+      - PYTHONPATH=/app
+      - PYTHONUNBUFFERED=1
+      - DEBUG=false
+      - TMDB_API_KEY=${TMDB_API_KEY:-}
+      - COLD_START_THRESHOLD=${COLD_START_THRESHOLD:-3}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 90s
+    networks:
+      - movierec-net
+    restart: unless-stopped
+
+  # React frontend served by nginx
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        # /api/* is reverse-proxied to the backend by nginx (see frontend/nginx.conf)
+        VITE_API_URL: /api
+    container_name: movierec-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      - movierec-net
+    restart: unless-stopped
+
+networks:
+  movierec-net:
+    driver: bridge
