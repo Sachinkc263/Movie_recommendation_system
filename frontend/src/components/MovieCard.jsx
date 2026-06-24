@@ -22,7 +22,7 @@ export default function MovieCard({
   onInteraction,
 }) {
   const navigate = useNavigate()
-  const { src: posterSrc, onError: handlePosterError } = usePoster(movie)
+  const { src: posterSrc, loading: posterLoading, onError: handlePosterError } = usePoster(movie)
 
   const handleClick = useCallback(async () => {
     if (userId && movie.movie_id) {
@@ -45,7 +45,11 @@ export default function MovieCard({
   return (
     <div onClick={handleClick} className={`group cursor-pointer ${className}`}>
       <div className="relative rounded-lg overflow-hidden bg-card border border-border aspect-[2/3] mb-2">
-        {posterSrc ? (
+        {posterLoading ? (
+          <div className="w-full h-full flex items-center justify-center bg-surface animate-pulse">
+            <div className="w-8 h-8 rounded-full border-2 border-accent border-t-transparent animate-spin" />
+          </div>
+        ) : posterSrc ? (
           <img
             src={posterSrc}
             alt={movie.title}

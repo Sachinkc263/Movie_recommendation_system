@@ -125,17 +125,23 @@ Evaluation contract (fixed across all runs):
 - Relevance threshold: rating >= 4.0 (movies the user would like)
 - Split: user-based 80/20 (random seed 42)
 
-| Model | Precision@10 | Catalogue Coverage |
-|---|---|---|
-| Popularity baseline | 0.0412 | 0.012 (1.2% of catalogue) |
-| Collaborative (SVD) | 0.0891 | 0.847 |
-| Content-based (TF-IDF) | 0.0734 | 0.923 |
-| **Hybrid (SVD + TF-IDF)** | **0.1024** | **1.000** |
+| Model | P@10 | R@10 | F1@10 | Hit Rate |
+|---|---|---|---|---|
+| Popularity baseline | 0.0429 | 0.0347 | 0.0383 | 0.0360 |
+| User-Based CF | 0.0048 | 0.0036 | 0.0041 | 0.0040 |
+| Item-Based CF | 0.0083 | 0.0135 | 0.0103 | 0.0070 |
+| Genre content-based | 0.0107 | 0.0066 | 0.0082 | 0.0090 |
+| TF-IDF content-based | 0.0095 | 0.0091 | 0.0093 | 0.0080 |
+| ImplicitALS (k=100) | 0.0500 | 0.0829 | 0.0624 | 0.0420 |
+| **Hybrid (ALS + TF-IDF)** | **0.0536** | **0.0853** | **0.0658** | **0.0450** |
 
-The hybrid model achieves the best precision AND 100% catalogue coverage,
-meaning it can recommend any of the 43,549 movies (not just popular ones).
+Evaluation contract: K=10, threshold >= 4.0, 100 users, seed=42 (fixed across all models).
 
-SVD validation RMSE: **0.8601** (n_components=50, selected by grid search).
+The hybrid model achieves the best precision and recall by combining
+ImplicitALS (70%) for personalised ranking with TF-IDF (30%) for content diversity.
+
+ImplicitALS is selected over explicit SVD because it optimises ranking (P@k) directly
+rather than RMSE. SVD validation RMSE from grid search: **0.8601** (n=50, full training set).
 
 ---
 

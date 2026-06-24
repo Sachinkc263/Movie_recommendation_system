@@ -64,7 +64,7 @@ models/*.joblib
 models/*.h5
 models/*.pt
 models/*.pth
-!models/popularity_scores.csv
+models/*.csv
 !models/.gitkeep
 !models/artifacts/.gitkeep
 
@@ -91,4 +91,4 @@ docker-compose.override.yml
 
 # ── Stale result dumps (reports/ JSON metrics are committed) ─────────────────
 results/
-reports/checkpoint_*.json
+reports/*.json

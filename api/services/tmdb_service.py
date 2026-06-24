@@ -8,10 +8,12 @@ import time
 from typing import Optional
 
 import requests
+from dotenv import load_dotenv
+
+load_dotenv()  # ensure .env is loaded before reading env vars at module level
 
 logger = logging.getLogger(__name__)
 
-_API_KEY = os.getenv("TMDB_API_KEY", "")
 _MOVIE_URL = "https://api.themoviedb.org/3/movie/{tmdb_id}?api_key={api_key}"
 _IMAGE_BASE = "https://image.tmdb.org/t/p"
 _CACHE_FILE = "data/cache/poster_cache.json"
@@ -74,13 +76,14 @@ class TmdbService:
                 val = self._cache[key]
                 return None if val == _NO_POSTER else val
 
-        # Cache miss — call TMDB API
-        if not _API_KEY:
+        # Cache miss — call TMDB API (read key at call time, not at import time)
+        api_key = os.getenv("TMDB_API_KEY", "")
+        if not api_key:
             logger.debug("TMDB_API_KEY not set; skipping poster fetch for tmdb_id=%s", tmdb_id)
             return None
 
         try:
-            url = _MOVIE_URL.format(tmdb_id=tmdb_id, api_key=_API_KEY)
+            url = _MOVIE_URL.format(tmdb_id=tmdb_id, api_key=api_key)
             resp = requests.get(url, timeout=6, headers={"Accept": "application/json"})
             resp.raise_for_status()
             path: Optional[str] = resp.json().get("poster_path") or None

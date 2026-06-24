@@ -1,9 +1,0 @@
-{
-  "precision@k": 0.042857142857142864,
-  "recall@k": 0.0346945083880483,
-  "f1@k": 0.0383462499758734,
-  "hit_rate": 0.036,
-  "evaluated_users": 100,
-  "coverage": 1.0,
-  "catalog_coverage": 0.0008564087924636027
-}

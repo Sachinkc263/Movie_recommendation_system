@@ -2,6 +2,9 @@
 
 import logging
 
+from dotenv import load_dotenv
+load_dotenv()  # must run before any service module reads os.getenv()
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -48,7 +51,7 @@ async def startup():
     try:
         from api.services.tmdb_service import tmdb_service
 
-        top_pairs = model_service.get_popular(n=300)
+        top_pairs = model_service.get_popular(n=1000)
         tmdb_ids: list[int] = []
         for movie_id, _ in top_pairs:
             meta = model_service.get_movie_meta(movie_id)
@@ -59,7 +62,7 @@ async def startup():
                     pass
 
         if tmdb_ids:
-            tmdb_service.prewarm(tmdb_ids, rate=12.0)
+            tmdb_service.prewarm(tmdb_ids, rate=15.0)
     except Exception as exc:
         logger.warning("Poster prewarm setup failed (non-fatal): %s", exc)
 

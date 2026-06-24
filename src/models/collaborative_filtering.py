@@ -496,9 +496,45 @@ class MatrixFactorizationCF:
     def predict(self, user_id: int, movie_id: int) -> float:
         return self._predict_one(user_id, movie_id, self.U, self.Vt)
 
+    def _fold_in_recommend(self, user_id: int, n: int) -> pd.DataFrame:
+        """SVD fold-in: estimate a virtual user vector via normal equations.
+
+        For a user not in the training matrix, solve:
+            x_u = argmin ||Vt[:,seen].T @ x_u - (r_seen - mean_u)||^2
+        using least-squares.  Then score all movies with mean_u + x_u @ Vt.
+        """
+        user_rows = self.train_ratings[self.train_ratings['userId'] == user_id]
+        if len(user_rows) == 0:
+            return pd.DataFrame()
+        user_mean = float(user_rows['rating'].mean())
+
+        seen_local, deltas = [], []
+        for _, row in user_rows.iterrows():
+            local = self.movie_idx.get(int(row['movieId']))
+            if local is not None:
+                seen_local.append(local)
+                deltas.append(float(row['rating']) - user_mean)
+        if not seen_local:
+            return pd.DataFrame()
+
+        Vt_sub = self.Vt[:, seen_local].T  # (n_seen, k)
+        x_u, _, _, _ = np.linalg.lstsq(Vt_sub, np.array(deltas), rcond=None)
+
+        scores = user_mean + x_u @ self.Vt
+        for idx in seen_local:
+            scores[idx] = -np.inf
+
+        n_top = min(n, len(scores))
+        top_local = np.argpartition(scores, -n_top)[-n_top:]
+        top_local = top_local[np.argsort(scores[top_local])[::-1]]
+        return pd.DataFrame({
+            'movieId': self.idx_movie[top_local],
+            'score': scores[top_local].astype(float),
+        })
+
     def recommend(self, user_id: int, n: int = 10) -> pd.DataFrame:
         if user_id not in self.user_idx:
-            return pd.DataFrame()
+            return self._fold_in_recommend(user_id, n)
 
         u = self.user_idx[user_id]
         mean = self.user_mean.get(user_id, self.global_mean)
@@ -506,8 +542,7 @@ class MatrixFactorizationCF:
         # Vectorized predicted scores for all movies in SVD space
         scores_vec = (mean + self.U[u] @ self.Vt).copy()
 
-        # On-demand rated-movie lookup — scans self.train_ratings for this user only.
-        # Avoids storing a 500MB+ dict of all 256k users' seen sets.
+        # On-demand rated-movie lookup
         user_rated = set(
             self.train_ratings.loc[
                 self.train_ratings['userId'] == user_id, 'movieId'
@@ -518,7 +553,6 @@ class MatrixFactorizationCF:
             if idx is not None:
                 scores_vec[idx] = -np.inf
 
-        # Vectorized top-n selection
         n_movies = len(scores_vec)
         k = min(n, n_movies)
         top_local = np.argpartition(scores_vec, -k)[-k:]
@@ -638,10 +672,51 @@ class ImplicitALSRecommender:
             f"k={k}, alpha={self.alpha}, reg={self.regularization}"
         )
 
+    def _fold_in_recommend(self, user_id: int, n: int) -> pd.DataFrame:
+        """ALS fold-in: solve normal equations for a user not in training.
+
+        For user u with observed ratings r_u, compute:
+            x_u = (Y[seen].T diag(c-1) Y[seen] + YtY + lambda*I)^-1 Y[seen].T c_u
+        where c_ui = 1 + alpha * r_ui.
+        """
+        uid = int(user_id)
+        user_rows = self.train_ratings[self.train_ratings['userId'] == uid]
+        if len(user_rows) == 0:
+            return pd.DataFrame()
+
+        seen_local, confs = [], []
+        for _, row in user_rows.iterrows():
+            local = self.item_idx.get(int(row['movieId']))
+            if local is not None:
+                seen_local.append(local)
+                confs.append(1.0 + self.alpha * float(row['rating']))
+        if not seen_local:
+            return pd.DataFrame()
+
+        seen_arr = np.array(seen_local, dtype=int)
+        conf_arr = np.array(confs, dtype=np.float64)
+        Y_sub = self.item_factors[seen_arr]  # (n_seen, k)
+        nf = self.n_factors
+        lam_I = self.regularization * np.eye(nf, dtype=np.float64)
+        A = Y_sub.T @ (Y_sub * conf_arr[:, None]) + lam_I
+        b = Y_sub.T @ conf_arr
+        x_u = np.linalg.solve(A, b)
+
+        scores = (x_u @ self.item_factors.T).copy()
+        scores[seen_arr] = -np.inf
+
+        n_top = min(n, len(scores))
+        top_local = np.argpartition(scores, -n_top)[-n_top:]
+        top_local = top_local[np.argsort(scores[top_local])[::-1]]
+        return pd.DataFrame({
+            'movieId': self.idx_item[top_local],
+            'score': scores[top_local].astype(float),
+        })
+
     def recommend(self, user_id: int, n: int = 10) -> pd.DataFrame:
         uid = int(user_id)
         if uid not in self.user_idx:
-            return pd.DataFrame()
+            return self._fold_in_recommend(uid, n)
 
         u = self.user_idx[uid]
         scores = (self.user_factors[u] @ self.item_factors.T).copy()
@@ -651,8 +726,8 @@ class ImplicitALSRecommender:
         if rated_local is not None and len(rated_local):
             scores[rated_local] = -np.inf
 
-        k = min(n, len(scores))
-        top_local = np.argpartition(scores, -k)[-k:]
+        n_top = min(n, len(scores))
+        top_local = np.argpartition(scores, -n_top)[-n_top:]
         top_local = top_local[np.argsort(scores[top_local])[::-1]]
 
         return pd.DataFrame({
