@@ -1,15 +1,15 @@
 # CineMatch - Hybrid Movie Recommendation System
 
 A production-ready, full-stack movie recommendation system combining
-**Collaborative Filtering** (SVD) and **Content-Based Filtering** (TF-IDF)
+**Collaborative Filtering** (ImplicitALS) and **Content-Based Filtering** (TF-IDF)
 with a FastAPI backend, a React frontend, and Docker deployment.
 
 ---
 
 ## Features
 
-- **Hybrid recommendations** - Centered TruncatedSVD + TF-IDF cosine similarity, blended at inference
-- **Cold-start handling** - SVD fold-in, content profile, genre filter, popularity fallback (waterfall)
+- **Hybrid recommendations** - ImplicitALS (70%) + TF-IDF cosine similarity (30%), blended at inference
+- **Cold-start handling** - ALS fold-in, content profile, genre filter, popularity fallback (waterfall)
 - **Implicit feedback** - likes, views, clicks and watches each carry calibrated weights
 - **Smart search** - normalised matching (`spiderman` finds `Spider-Man`), debounced autocomplete, pagination
 - **Poster freshness** - stale 2020 CSV poster paths refreshed on demand via TMDB API with server-side cache
@@ -22,7 +22,7 @@ with a FastAPI backend, a React frontend, and Docker deployment.
 
 | Approach | When used | How it works |
 |---|---|---|
-| SVD fold-in (hybrid) | >= 3 interactions | Solves for virtual user vector; blends SVD + TF-IDF scores |
+| ALS fold-in (hybrid) | >= 3 interactions | Solves normal equations for virtual user vector; blends ALS + TF-IDF scores |
 | TF-IDF content profile | Has liked >= 1 movie | Cosine similarity against liked movie feature vectors |
 | Genre popularity | Genre prefs from onboarding | Popularity ranking filtered to preferred genres |
 | Global popularity | Brand-new user | Bayesian-smoothed global popularity baseline |
@@ -50,14 +50,17 @@ After cleaning and merging: **43,549 movies**, 100% TMDB ID coverage.
 
 Metrics fixed at K=10, relevance threshold >= 4.0, user-based 80/20 split (seed 42).
 
-| Model | Precision@10 | Catalogue Coverage |
-|---|---|---|
-| Popularity baseline | 0.0412 | 0.012 |
-| Collaborative (SVD only) | 0.0891 | 0.847 |
-| Content-based (TF-IDF only) | 0.0734 | 0.923 |
-| **Hybrid (SVD + TF-IDF)** | **0.1024** | **1.000** |
+| Model | P@10 | R@10 | F1@10 | Hit Rate |
+|---|---|---|---|---|
+| Popularity baseline | 0.0429 | 0.0347 | 0.0383 | 0.0360 |
+| User-Based CF | 0.0048 | 0.0036 | 0.0041 | 0.0040 |
+| Item-Based CF | 0.0083 | 0.0135 | 0.0103 | 0.0070 |
+| Genre content-based | 0.0107 | 0.0066 | 0.0082 | 0.0090 |
+| TF-IDF content-based | 0.0095 | 0.0091 | 0.0093 | 0.0080 |
+| ImplicitALS (k=100) | 0.0500 | 0.0829 | 0.0624 | 0.0420 |
+| **Hybrid (ALS + TF-IDF)** | **0.0536** | **0.0853** | **0.0658** | **0.0450** |
 
-SVD validation RMSE: **0.8601** (n_components=50)
+SVD validation RMSE: **0.8601** (n_components=50, grid search from notebook 06)
 
 ---
 
@@ -66,7 +69,7 @@ SVD validation RMSE: **0.8601** (n_components=50)
 | Layer | Technology |
 |---|---|
 | Backend | Python 3.10, FastAPI, SQLAlchemy, SQLite |
-| ML | scikit-learn (TruncatedSVD, TF-IDF), NumPy, SciPy |
+| ML | scikit-learn (TruncatedSVD, TF-IDF), ImplicitALS, NumPy, SciPy |
 | Frontend | React 18, Vite, Tailwind CSS, React Router |
 | Serving | uvicorn (API), nginx (frontend + reverse proxy) |
 | Containerisation | Docker, Docker Compose |
@@ -81,7 +84,7 @@ SVD validation RMSE: **0.8601** (n_components=50)
     |   |-- models/                  SQLAlchemy ORM + Pydantic schemas
     |   |-- routes/                  movies, recommendations, users/interactions
     |   `-- services/
-    |       |-- model_service.py     SVD + TF-IDF inference engine
+    |       |-- model_service.py     ALS + TF-IDF inference engine
     |       |-- user_service.py      Interaction aggregation, implicit weights
     |       `-- tmdb_service.py      TMDB poster cache
     |
@@ -153,7 +156,7 @@ SVD validation RMSE: **0.8601** (n_components=50)
 Edit `.env` and fill in:
 
     TMDB_API_KEY=your_key_here          # required for poster images
-    COLD_START_THRESHOLD=3              # interactions before SVD fold-in
+    COLD_START_THRESHOLD=3              # interactions before ALS fold-in
     DEBUG=false
     VITE_API_URL=http://localhost:8000  # for local dev (Docker uses /api)
 
@@ -266,7 +269,7 @@ Run in order - each saves outputs consumed by the next.
 | 03_data_preprocessing.ipynb | Merge datasets, normalise features, user-based train/test split |
 | 04_feature_engineering.ipynb | Engineer movie and user features for model training |
 | 05_popularity_baseline.ipynb | Bayesian popularity baseline - sets the performance floor |
-| 06_collaborative_filtering.ipynb | Centered TruncatedSVD - grid-search n_components, evaluate RMSE + P@10 |
+| 06_collaborative_filtering.ipynb | CF models: User-CF, Item-CF, SVD (grid-search RMSE), ImplicitALS (P@10) |
 | 07_content_based_filtering.ipynb | TF-IDF on feature soup - genres + overview + cast + keywords |
 | 08_hybrid_recommendation.ipynb | Hybrid combination, final metrics, artifact export |
 
@@ -281,10 +284,10 @@ Run `python scripts/evaluate.py` to reproduce all metrics.
 Results are saved to `reports/` as JSON files.
 
 Key findings:
-- SVD achieves strong precision but misses niche movies (84.7% coverage)
-- TF-IDF reaches 92.3% coverage but lower precision on popular titles
-- The hybrid combines both strengths: highest precision AND 100% coverage
-- SVD fold-in allows immediate personalisation for new users without retraining
+- ImplicitALS (P@10=0.0500) is the strongest individual model: it optimises ranking directly rather than RMSE
+- Content-based models (genre, TF-IDF) score below popularity; their value is full catalogue coverage for cold-start
+- The hybrid (ALS 70% + TF-IDF 30%) achieves the best precision and recall across all models
+- ALS fold-in allows immediate personalisation for new users without retraining
 
 ---
 
