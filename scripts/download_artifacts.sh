@@ -21,16 +21,15 @@ dl() {
     echo "[done] $file"
 }
 
-# SVD artifacts
+# SVD artifacts (for personalised recommendations)
 dl "svd_U.npy"        "$ARTIFACTS_DIR"
 dl "svd_Vt.npy"       "$ARTIFACTS_DIR"
 dl "svd_meta.pkl"     "$ARTIFACTS_DIR"
 
-# TF-IDF artifacts
+# TF-IDF artifacts (for content-based + similar movies)
 dl "tfidf_matrix.npz" "$ARTIFACTS_DIR"
 dl "tfidf_meta.pkl"   "$ARTIFACTS_DIR"
 
-# Movie metadata (not in git — too large)
-dl "movies_integrated.csv" "$DATA_DIR"
+# movies_integrated.csv is committed in git — no download needed.
 
 echo "All artifacts ready."

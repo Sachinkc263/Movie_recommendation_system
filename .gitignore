@@ -44,6 +44,8 @@ data/processed/*.npz
 data/processed/*.npy
 data/processed/*.pkl
 !data/processed/.gitkeep
+# movies_integrated.csv committed directly — Render and GitHub Pages need it at runtime
+!data/processed/movies_integrated.csv
 
 # Poster cache (small, pre-fetched TMDB paths — commit to avoid cold-start API calls)
 !data/cache/
