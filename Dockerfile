@@ -6,7 +6,7 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc g++ && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt .
+COPY api/requirements.txt .
 RUN pip install --no-cache-dir --user -r requirements.txt
 
 # ── Runtime stage ──────────────────────────────────────────────────────────────
@@ -20,19 +20,25 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY --from=builder /root/.local /root/.local
 ENV PATH=/root/.local/bin:$PATH
 
-# Copy only the packages required at runtime
-COPY api/    ./api/
-COPY src/    ./src/
+# Application source
+COPY api/     ./api/
+COPY src/     ./src/
+COPY scripts/ ./scripts/
 
-# Ensure data/models/logs directories exist (volumes will be mounted over them)
-RUN mkdir -p data/processed data/raw data/figures data/cache models/artifacts logs
+# Static runtime data that ships with the repo
+COPY models/popularity_scores.csv        ./models/popularity_scores.csv
+COPY data/processed/movies_integrated.csv ./data/processed/movies_integrated.csv
+
+# Pre-create directories for artifacts downloaded at startup and runtime state
+RUN mkdir -p models/artifacts data/cache logs
 
 ENV PYTHONPATH=/app
 ENV PYTHONUNBUFFERED=1
 
 EXPOSE 8000
 
-HEALTHCHECK --interval=30s --timeout=10s --start-period=90s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=10s --start-period=120s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 
-CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
+# scripts/start.sh downloads ML artifacts then starts uvicorn
+CMD ["/bin/bash", "/app/scripts/start.sh"]
