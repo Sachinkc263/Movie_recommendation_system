@@ -22,6 +22,7 @@ class Settings:
         "http://localhost:3000",
         "http://localhost:8080",
         "http://frontend:80",
+        "https://sachinkc263.github.io",  # GitHub Pages
     ]
 
     # Recommendation defaults

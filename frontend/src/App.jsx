@@ -88,7 +88,7 @@ function AppRoutes() {
 
 export default function App() {
   return (
-    <BrowserRouter>
+    <BrowserRouter basename="/Movie_recommendation_system">
       <AppRoutes />
     </BrowserRouter>
   )

@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: movie-recommendation-api
+    runtime: python
+    buildCommand: pip install -r api/requirements.txt
+    startCommand: bash scripts/download_artifacts.sh && uvicorn api.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.10.13
+      - key: TMDB_API_KEY
+        sync: false       # set this in the Render dashboard — never commit the real key
+      - key: DEBUG
+        value: false
